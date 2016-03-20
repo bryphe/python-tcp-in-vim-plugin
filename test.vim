@@ -71,16 +71,28 @@ startSocket()
 
 def testSocket(*arg):
     import json
-    message = json.dumps(arg)
+    message = json.dumps(arg[0])
     messagesToSend.put(message)
 
 def printMessages():
     try:
         while True:
-            print receivedMessages.get_nowait()
+            messages = receivedMessages.get_nowait()
+            print messages
+            return messages
     except:
         pass
 EOF
+
+function! PrintMessages()
+python << EOF
+messages = printMessages()
+vim.command("let sInVim = %s"% messages)
+EOF
+
+echom sInVim
+
+endfunc
 
 function! TestSocket(arg)
 
@@ -95,5 +107,6 @@ command! -nargs=* MyCommand :python test(<f-args>)
 command! -nargs=* TestSocket :call TestSocket(<q-args>)
 command! -nargs=0 StartSocket :python startSocket()
 command! -nargs=0 StopSocket :python stopSocket()
-command! -nargs=* PrintMessages :python printMessages(<f-args>)
+command! -nargs=0 PrintMessages :call PrintMessages(<f-args>)
 
+autocmd VimLeavePre * :python stopSocket()

@@ -6,7 +6,8 @@ var server = net.createServer(function (socket) {
     socket.on("data", function(data) {
         var stringData = data.toString("utf8");
         console.log(stringData);
-        socket.write("test return: " + stringData + "\n");
+        var obj = JSON.parse(stringData);
+        socket.write(JSON.stringify(obj) + "\n");
     });
 
     socket.on("close", function () {
