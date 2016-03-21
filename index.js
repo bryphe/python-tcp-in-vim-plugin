@@ -5,8 +5,17 @@ var server = net.createServer(function (socket) {
 
     socket.on("data", function(data) {
         var stringData = data.toString("utf8");
-        console.log(stringData);
-        var obj = JSON.parse(stringData);
+        var stringObject = JSON.parse(stringData);
+        stringObject = stringObject.replace(/''/g, "\\\"");
+        stringObject = stringObject.replace(/'/g, "\"");
+        console.log(stringObject);
+        var obj = JSON.parse(stringObject);
+        console.log(typeof(obj));
+        if(typeof(obj) === "array") {
+            obj.forEach(function (val)  {
+                console.log(val);
+            });
+        }
         socket.write(JSON.stringify(obj) + "\n");
     });
 

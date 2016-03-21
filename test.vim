@@ -3,76 +3,93 @@ import threading
 import Queue
 import socket
 import time
+import json
 
-messagesToSend = Queue.Queue()
-receivedMessages = Queue.Queue()
-s = None
+class SocketListener:
 
-def listenForMessages(sock, stopEvent):
-    while (not stopEvent.is_set()):
-        try:
-            message = messagesToSend.get_nowait()
-            sock.send(message)
-        except:
-            pass
-        stopEvent.wait(0.01)
+    def __init__(self, ip, port):
+        self.sock = None
+        self.ip = ip
+        self.port = port
 
-def sendMessages(sock, stopEvent):
-    buffer = ""
-    character = ""
-    while (not stopEvent.is_set()):
-        try:
-            character = sock.recv(1)
-        except:
-            pass
-        if '\n' in character:
-            receivedMessages.put(buffer)
-            buffer = ""
-        else:
-            buffer += character
-        stopEvent.wait(0.01)
+    def startSocket(self):
+        import socket 
 
-threadStop = threading.Event()
-
-def stopSocket():
-    global s
-
-    if s == None:
-        return
-
-    print "closing"
-    try:
-        s.shutdown(socket.SHUT_RDWR)
-    except:
-        pass
-    threadStop.set()
-    s.close()
-    s = None
-
-def startSocket():
-        import json
-        global s
-
-        TCP_IP = "127.0.0.1"
-        TCP_PORT = 5005
         BUFFER_SIZE = 1
 
-        if s == None:
-            s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            s.connect((TCP_IP, TCP_PORT))
+        if self.sock == None:
+            self.messagesToSend = Queue.Queue()
+            self.receivedMessages = Queue.Queue()
+            self.stopEvent = threading.Event()
 
-            threadStop.clear()
-            receivedThread = threading.Thread(target = listenForMessages, args=(s, threadStop,))
-            sendThread = threading.Thread(target = sendMessages, args=(s, threadStop,))
-            receivedThread.start()
-            sendThread.start()
+            self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            self.sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
+            self.sock.connect((self.ip, self.port))
 
-startSocket()
+            self.receivedThread = threading.Thread(target = self._listenForMessages)
+            self.sendThread = threading.Thread(target = self._sendMessages)
+            self.receivedThread.start()
+            self.sendThread.start()
+
+    def stopSocket(self):
+        import socket
+        if self.sock == None:
+            return
+
+        print "closing"
+        try:
+            self.sock.shutdown(socket.SHUT_RDWR)
+        except:
+            pass
+        self.stopEvent.set()
+        self.sock.close()
+        self.sock = None
+
+    def sendMessage(self, msg):
+        import json
+        msg = json.dumps(msg)
+        self.messagesToSend.put(msg)
+
+    def getMessages(self):
+        ret = []
+        try:
+            while True:
+                message = self.receivedMessages.get_nowait()
+                ret.append(message);
+        except:
+            pass
+        return ret
+
+    def _listenForMessages(self):
+        while (not self.stopEvent.is_set()):
+            try:
+                message = self.messagesToSend.get_nowait()
+                self.sock.send(message)
+            except:
+                pass
+            self.stopEvent.wait(0.01)
+
+    def _sendMessages(self):
+        buffer = ""
+        character = ""
+        while (not self.stopEvent.is_set()):
+            try:
+                character = self.sock.recv(1)
+            except:
+                pass
+            if '\n' in character:
+                self.receivedMessages.put(buffer)
+                buffer = ""
+            else:
+                buffer += character
+            self.stopEvent.wait(0.01)
+
+socket = SocketListener("127.0.0.1", 5005)
+socket.startSocket()
+
 
 def testSocket(*arg):
-    import json
-    message = json.dumps(arg[0])
-    messagesToSend.put(message)
+    socket.sendMessage(arg[0]);
 
 def printMessages():
     try:
@@ -86,11 +103,10 @@ EOF
 
 function! PrintMessages()
 python << EOF
-messages = printMessages()
-vim.command("let sInVim = %s"% messages)
+for msg in socket.getMessages():
+    print msg
 EOF
 
-echom sInVim
 
 endfunc
 
@@ -103,10 +119,12 @@ EOF
 endfunc
 
 
+
+
 command! -nargs=* MyCommand :python test(<f-args>)
-command! -nargs=* TestSocket :call TestSocket(<q-args>)
-command! -nargs=0 StartSocket :python startSocket()
-command! -nargs=0 StopSocket :python stopSocket()
+command! -nargs=* TestSocket :call TestSocket(<f-args>)
+command! -nargs=0 StartSocket :python socket.startSocket()
+command! -nargs=0 StopSocket :python socket.stopSocket()
 command! -nargs=0 PrintMessages :call PrintMessages(<f-args>)
 
-autocmd VimLeavePre * :python stopSocket()
+autocmd VimLeavePre * :python socket.stopSocket()
