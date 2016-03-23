@@ -1,7 +1,8 @@
-pyfile socket.py
+let s:path = fnamemodify(resolve(expand('<sfile>:p')), ':h') . '\socket.py'
+execute 'pyfile '.s:path
 python << EOF
-socket = SocketListener("127.0.0.1", 5005)
-socket.startSocket()
+# socket = SocketListener("127.0.0.1", 5005)
+# socket.startSocket()
 
 
 def testSocket(*arg):
@@ -19,9 +20,24 @@ EOF
 
 function! PrintMessages()
 python << EOF
-for msg in socket.getMessages():
-    print msg
+import vim
+import json
+import time
+
+#for msg in socket.getMessages():
+#print msg
+
+start = time.time();
+array = []
+for line in vim.current.buffer:
+    array.append(line)
+
+dump = json.dumps(array)
+end = time.time();
+print(end-start)
 EOF
+
+
 
 
 endfunc
